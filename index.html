@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warhammer 40k Datasheet Repository</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- React and ReactDOM CDN -->
+    <script src="https://unpkg.com/react/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX transformation (for local development, in production use a build step) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        function App() {
+            // Moved destructuring of React hooks inside the component
+            const { useState, useEffect } = React; 
+
+            const [factions, setFactions] = useState([]);
+            const [datasheets, setDatasheets] = useState([]);
+            const [searchTermFaction, setSearchTermFaction] = useState('');
+            const [searchTermUnit, setSearchTermUnit] = useState('');
+            const [filteredDatasheets, setFilteredDatasheets] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            // Base URL for local JSON files
+            const BASE_JSON_URL = './public/data/'; // Points to the 'public/data' folder
+
+            // Function to fetch and parse a single JSON file
+            const fetchJson = async (fileName) => {
+                try {
+                    const response = await fetch(`${BASE_JSON_URL}${fileName}.json`);
+                    if (!response.ok) {
+                        // More specific error message for file not found
+                        if (response.status === 404) {
+                            throw new Error(`File not found: ${fileName}.json. Please ensure it's in the '${BASE_JSON_URL}' directory.`);
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const jsonData = await response.json();
+                    return jsonData;
+                } catch (e) {
+                    console.error(`Error fetching ${fileName}.json:`, e);
+                    setError(`Failed to load data: ${e.message}. Check console for details.`);
+                    return null;
+                }
+            };
+
+            useEffect(() => {
+                const loadData = async () => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                        // Fetch from local JSON files
+                        const fetchedFactions = await fetchJson('Factions');
+                        const fetchedDatasheets = await fetchJson('Datasheets');
+
+                        if (fetchedFactions && fetchedDatasheets) {
+                            setFactions(fetchedFactions);
+                            setDatasheets(fetchedDatasheets);
+                        }
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                loadData();
+            }, []);
+
+            useEffect(() => {
+                let currentFilteredDatasheets = datasheets;
+
+                if (searchTermFaction) {
+                    const lowerCaseSearchTermFaction = searchTermFaction.toLowerCase();
+                    const matchingFactions = factions.filter(faction =>
+                        faction.name.toLowerCase().includes(lowerCaseSearchTermFaction)
+                    );
+                    const matchingFactionIds = new Set(matchingFactions.map(f => f.id));
+
+                    currentFilteredDatasheets = currentFilteredDatasheets.filter(datasheet =>
+                        matchingFactionIds.has(datasheet.faction_id)
+                    );
+                }
+
+                if (searchTermUnit) {
+                    const lowerCaseSearchTermUnit = searchTermUnit.toLowerCase();
+                    currentFilteredDatasheets = currentFilteredDatasheets.filter(datasheet =>
+                        datasheet.name.toLowerCase().includes(lowerCaseSearchTermUnit)
+                    );
+                }
+
+                const datasheetsWithFactionNames = currentFilteredDatasheets.map(datasheet => {
+                    const faction = factions.find(f => f.id === datasheet.faction_id);
+                    return {
+                        ...datasheet,
+                        factionName: faction ? faction.name : 'Unknown Faction',
+                    };
+                });
+
+                setFilteredDatasheets(datasheetsWithFactionNames);
+            }, [searchTermFaction, searchTermUnit, datasheets, factions]);
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-100">
+                        <div className="text-lg font-semibold">Loading Warhammer 40k data...</div>
+                    </div>
+                );
+            }
+
+            if (error) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-red-400 p-4">
+                        <div className="text-lg font-semibold text-center">Error: {error}</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-900 text-gray-100 font-inter p-4 sm:p-6 md:p-8">
+                    <div className="max-w-4xl mx-auto">
+                        <h1 className="text-4xl font-bold text-center mb-8 text-blue-400">
+                            Warhammer 40k Datasheet Repository
+                        </h1>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            <input
+                                type="text"
+                                placeholder="Search by Faction Name (e.g., Space Marines)"
+                                className="p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+                                value={searchTermFaction}
+                                onChange={(e) => setSearchTermFaction(e.target.value)}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Search by Unit Name (e.g., Intercessors)"
+                                className="p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+                                value={searchTermUnit}
+                                onChange={(e) => setSearchTermUnit(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="bg-gray-800 rounded-xl shadow-lg p-6">
+                            <h2 className="text-2xl font-semibold mb-4 text-blue-300">
+                                {searchTermFaction || searchTermUnit ? 'Filtered Units' : 'All Units'} ({filteredDatasheets.length})
+                            </h2>
+                            {filteredDatasheets.length === 0 && (
+                                <p className="text-gray-400 text-center">No units found matching your criteria.</p>
+                            )}
+                            <div className="space-y-4">
+                                {filteredDatasheets.map((datasheet) => (
+                                    <div
+                                        key={datasheet.id}
+                                        className="bg-gray-700 p-4 rounded-lg shadow-md border border-gray-600 hover:border-blue-500 transition-all duration-200"
+                                    >
+                                        <h3 className="text-xl font-bold text-white mb-1">{datasheet.name}</h3>
+                                        <p className="text-blue-200 text-sm mb-2">Faction: {datasheet.factionName}</p>
+                                        <div className="text-gray-300 text-sm">
+                                            <p>Role: {datasheet.role || 'N/A'}</p>
+                                            <p>Power Points: {datasheet.power_points || 'N/A'}</p>
+                                            {datasheet.link && (
+                                                <a
+                                                    href={datasheet.link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-400 hover:text-blue-300 underline mt-2 inline-block"
+                                                >
+                                                    View on Wahapedia
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <p className="text-center text-gray-500 text-sm mt-8">
+                            Powered by <a href="http://wahapedia.ru/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Wahapedia.ru</a>
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
