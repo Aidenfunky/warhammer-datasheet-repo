@@ -37,7 +37,8 @@
             const [error, setError] = useState(null);
 
             // Base URL for local JSON files
-            const BASE_JSON_URL = './public/data/'; // Points to the 'public/data' folder
+            // This path is relative to index.html, so it points to public/data/
+            const BASE_JSON_URL = './public/data/'; 
 
             // Function to fetch and parse a single JSON file
             const fetchJson = async (fileName) => {
@@ -83,6 +84,7 @@
             useEffect(() => {
                 let currentFilteredDatasheets = datasheets;
 
+                // Filter by faction
                 if (searchTermFaction) {
                     const lowerCaseSearchTermFaction = searchTermFaction.toLowerCase();
                     const matchingFactions = factions.filter(faction =>
@@ -95,6 +97,7 @@
                     );
                 }
 
+                // Filter by unit name
                 if (searchTermUnit) {
                     const lowerCaseSearchTermUnit = searchTermUnit.toLowerCase();
                     currentFilteredDatasheets = currentFilteredDatasheets.filter(datasheet =>
@@ -102,6 +105,7 @@
                     );
                 }
 
+                // Map datasheets to include faction name for display
                 const datasheetsWithFactionNames = currentFilteredDatasheets.map(datasheet => {
                     const faction = factions.find(f => f.id === datasheet.faction_id);
                     return {
@@ -111,7 +115,7 @@
                 });
 
                 setFilteredDatasheets(datasheetsWithFactionNames);
-            }, [searchTermFaction, searchTermUnit, datasheets, factions]);
+            }, [searchTermFaction, searchTermUnit, datasheets, factions]); // Dependencies for filtering
 
             if (loading) {
                 return (
@@ -195,7 +199,10 @@
             );
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        // Ensure ReactDOM.render is called after all resources are loaded
+        window.onload = function() {
+            ReactDOM.render(<App />, document.getElementById('root'));
+        };
     </script>
 </body>
 </html>
