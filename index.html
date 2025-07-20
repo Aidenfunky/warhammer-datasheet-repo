@@ -6,28 +6,34 @@
     <title>Warhammer 40k Datasheet Repository</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts - Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts - Inter (for body) and Orbitron (for headings) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        /* Default font for the body */
         body {
             font-family: 'Inter', sans-serif;
+        }
+        /* Custom class for headings using Orbitron */
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
         }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- React and ReactDOM CDN -->
-    <script src="https://unpkg.com/react/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+    <!-- React and ReactDOM CDN - Updated to stable version 18.2.0 -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <!-- Babel for JSX transformation (for local development, in production use a build step) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
         function App() {
-            // Moved destructuring of React hooks inside the component
-            const { useState, useEffect } = React; 
+            // Destructuring React hooks for use in the component
+            const { useState, useEffect } = React;
 
+            // State variables for factions, datasheets, search terms, filtered results, loading, and errors
             const [factions, setFactions] = useState([]);
             const [datasheets, setDatasheets] = useState([]);
             const [searchTermFaction, setSearchTermFaction] = useState('');
@@ -36,151 +42,168 @@
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
 
-            // Base URL for local JSON files
-            // This path is relative to index.html, so it points to public/data/
-            const BASE_JSON_URL = './public/data/'; 
+            // Base URL for local JSON files, relative to index.html
+            const BASE_JSON_URL = './public/data/';
 
-            // Function to fetch and parse a single JSON file
+            // Function to fetch and parse a JSON file
             const fetchJson = async (fileName) => {
                 try {
                     const response = await fetch(`${BASE_JSON_URL}${fileName}.json`);
                     if (!response.ok) {
-                        // More specific error message for file not found
+                        // Provide specific error message if file not found (404)
                         if (response.status === 404) {
                             throw new Error(`File not found: ${fileName}.json. Please ensure it's in the '${BASE_JSON_URL}' directory.`);
                         }
+                        // Generic HTTP error for other status codes
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    const jsonData = await response.json();
+                    const jsonData = await response.json(); // Parse the JSON response
                     return jsonData;
                 } catch (e) {
+                    // Log the error to the console for debugging
                     console.error(`Error fetching ${fileName}.json:`, e);
+                    // Set a user-friendly error message
                     setError(`Failed to load data: ${e.message}. Check console for details.`);
                     return null;
                 }
             };
 
+            // useEffect hook to load data when the component mounts
             useEffect(() => {
                 const loadData = async () => {
-                    setLoading(true);
-                    setError(null);
+                    setLoading(true); // Set loading state to true
+                    setError(null); // Clear any previous errors
                     try {
-                        // Fetch from local JSON files
+                        // Fetch Factions and Datasheets JSON files
                         const fetchedFactions = await fetchJson('Factions');
                         const fetchedDatasheets = await fetchJson('Datasheets');
 
+                        // If both fetches are successful, update state
                         if (fetchedFactions && fetchedDatasheets) {
                             setFactions(fetchedFactions);
                             setDatasheets(fetchedDatasheets);
                         }
                     } finally {
-                        setLoading(false);
+                        setLoading(false); // Set loading state to false regardless of success or failure
                     }
                 };
 
-                loadData();
-            }, []);
+                loadData(); // Call the data loading function
+            }, []); // Empty dependency array ensures this runs only once on mount
 
+            // useEffect hook to filter datasheets whenever search terms or data changes
             useEffect(() => {
                 let currentFilteredDatasheets = datasheets;
 
-                // Filter by faction
+                // Filter by faction name if a search term is provided
                 if (searchTermFaction) {
                     const lowerCaseSearchTermFaction = searchTermFaction.toLowerCase();
+                    // Find factions that match the search term
                     const matchingFactions = factions.filter(faction =>
                         faction.name.toLowerCase().includes(lowerCaseSearchTermFaction)
                     );
+                    // Get a set of IDs for matching factions for efficient lookup
                     const matchingFactionIds = new Set(matchingFactions.map(f => f.id));
 
+                    // Filter datasheets to only include those belonging to matching factions
                     currentFilteredDatasheets = currentFilteredDatasheets.filter(datasheet =>
                         matchingFactionIds.has(datasheet.faction_id)
                     );
                 }
 
-                // Filter by unit name
+                // Further filter by unit name if a search term is provided
                 if (searchTermUnit) {
                     const lowerCaseSearchTermUnit = searchTermUnit.toLowerCase();
+                    // Filter datasheets where the unit name includes the search term
                     currentFilteredDatasheets = currentFilteredDatasheets.filter(datasheet =>
                         datasheet.name.toLowerCase().includes(lowerCaseSearchTermUnit)
                     );
                 }
 
-                // Map datasheets to include faction name for display
+                // Map filtered datasheets to include the full faction name for display
                 const datasheetsWithFactionNames = currentFilteredDatasheets.map(datasheet => {
+                    // Find the corresponding faction object using faction_id
                     const faction = factions.find(f => f.id === datasheet.faction_id);
                     return {
-                        ...datasheet,
-                        factionName: faction ? faction.name : 'Unknown Faction',
+                        ...datasheet, // Spread existing datasheet properties
+                        factionName: faction ? faction.name : 'Unknown Faction', // Add faction name or default
                     };
                 });
 
-                setFilteredDatasheets(datasheetsWithFactionNames);
-            }, [searchTermFaction, searchTermUnit, datasheets, factions]); // Dependencies for filtering
+                setFilteredDatasheets(datasheetsWithFactionNames); // Update the filtered datasheets state
+            }, [searchTermFaction, searchTermUnit, datasheets, factions]); // Dependencies: re-run when these values change
 
+            // Render loading state
             if (loading) {
                 return (
-                    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-100">
-                        <div className="text-lg font-semibold">Loading Warhammer 40k data...</div>
+                    <div className="flex items-center justify-center min-h-screen bg-neutral-900 text-neutral-100">
+                        <div className="text-lg font-semibold">Loading Warhammer 40k data... For the Emperor!</div>
                     </div>
                 );
             }
 
+            // Render error state
             if (error) {
                 return (
-                    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-red-400 p-4">
+                    <div className="flex items-center justify-center min-h-screen bg-neutral-900 text-red-400 p-4">
                         <div className="text-lg font-semibold text-center">Error: {error}</div>
                     </div>
                 );
             }
 
+            // Main application render
             return (
-                <div className="min-h-screen bg-gray-900 text-gray-100 font-inter p-4 sm:p-6 md:p-8">
-                    <div className="max-w-4xl mx-auto">
-                        <h1 className="text-4xl font-bold text-center mb-8 text-blue-400">
-                            Warhammer 40k Datasheet Repository
+                <div className="min-h-screen bg-neutral-900 text-neutral-100 font-inter p-4 sm:p-6 md:p-8">
+                    <div className="max-w-4xl mx-auto border-2 border-red-800 rounded-lg shadow-2xl shadow-red-950/50 p-6 bg-neutral-800">
+                        {/* Main Title */}
+                        <h1 className="text-4xl sm:text-5xl font-bold text-center mb-8 font-orbitron text-red-600 uppercase tracking-wide">
+                            Warhammer 40k Datasheets
                         </h1>
 
+                        {/* Search Bars */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                             <input
                                 type="text"
                                 placeholder="Search by Faction Name (e.g., Space Marines)"
-                                className="p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+                                className="p-3 rounded-lg bg-neutral-900 border border-neutral-600 focus:outline-none focus:ring-2 focus:ring-amber-400 text-neutral-100 placeholder-neutral-400"
                                 value={searchTermFaction}
                                 onChange={(e) => setSearchTermFaction(e.target.value)}
                             />
                             <input
                                 type="text"
                                 placeholder="Search by Unit Name (e.g., Intercessors)"
-                                className="p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+                                className="p-3 rounded-lg bg-neutral-900 border border-neutral-600 focus:outline-none focus:ring-2 focus:ring-amber-400 text-neutral-100 placeholder-neutral-400"
                                 value={searchTermUnit}
                                 onChange={(e) => setSearchTermUnit(e.target.value)}
                             />
                         </div>
 
-                        <div className="bg-gray-800 rounded-xl shadow-lg p-6">
-                            <h2 className="text-2xl font-semibold mb-4 text-blue-300">
+                        {/* Datasheet Display Area */}
+                        <div className="bg-neutral-800 rounded-xl shadow-lg p-6 border border-neutral-600">
+                            <h2 className="text-2xl font-semibold mb-4 font-orbitron text-amber-400 uppercase">
                                 {searchTermFaction || searchTermUnit ? 'Filtered Units' : 'All Units'} ({filteredDatasheets.length})
                             </h2>
                             {filteredDatasheets.length === 0 && (
-                                <p className="text-gray-400 text-center">No units found matching your criteria.</p>
+                                <p className="text-neutral-400 text-center">No units found matching your criteria. For the Emperor!</p>
                             )}
                             <div className="space-y-4">
                                 {filteredDatasheets.map((datasheet) => (
                                     <div
                                         key={datasheet.id}
-                                        className="bg-gray-700 p-4 rounded-lg shadow-md border border-gray-600 hover:border-blue-500 transition-all duration-200"
+                                        className="bg-neutral-700 p-4 rounded-lg shadow-md border border-neutral-600 hover:border-red-600 transition-all duration-200"
                                     >
-                                        <h3 className="text-xl font-bold text-white mb-1">{datasheet.name}</h3>
-                                        <p className="text-blue-200 text-sm mb-2">Faction: {datasheet.factionName}</p>
-                                        <div className="text-gray-300 text-sm">
+                                        <h3 className="text-xl font-bold text-neutral-100 mb-1">{datasheet.name}</h3>
+                                        <p className="text-amber-300 text-sm mb-2">Faction: {datasheet.factionName}</p>
+                                        <div className="text-neutral-300 text-sm">
                                             <p>Role: {datasheet.role || 'N/A'}</p>
                                             <p>Power Points: {datasheet.power_points || 'N/A'}</p>
+                                            {/* Link to Wahapedia */}
                                             {datasheet.link && (
                                                 <a
                                                     href={datasheet.link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-blue-400 hover:text-blue-300 underline mt-2 inline-block"
+                                                    className="text-red-500 hover:text-red-400 underline mt-2 inline-block font-orbitron"
                                                 >
                                                     View on Wahapedia
                                                 </a>
@@ -191,8 +214,9 @@
                             </div>
                         </div>
 
-                        <p className="text-center text-gray-500 text-sm mt-8">
-                            Powered by <a href="http://wahapedia.ru/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Wahapedia.ru</a>
+                        {/* Footer attribution */}
+                        <p className="text-center text-neutral-500 text-sm mt-8">
+                            Powered by <a href="http://wahapedia.ru/" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">Wahapedia.ru</a>
                         </p>
                     </div>
                 </div>
